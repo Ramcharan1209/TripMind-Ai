@@ -1,0 +1,162 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>TripMind AI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--card:#fff;--ink:#1c2033;--mut:#6b7190;--pri:#5b6cff;--line:#e6e8f5;--ok:#2f9e44;--warn:#f08c00;--bad:#e03131}
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,system-ui,sans-serif;background:#f3f4fb;color:var(--ink)}
+.hero{background:linear-gradient(135deg,#1b1f4b,#5b6cff 60%,#8a5bff);color:#fff;padding:34px 20px 90px;text-align:center}
+.hero h1{margin:0;font-size:34px}.hero p{margin:8px 0 0;opacity:.85}
+.chips{margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.chips span{background:#ffffff26;border-radius:99px;padding:4px 12px;font-size:12px}
+.wrap{max-width:1150px;margin:-64px auto 40px;padding:0 16px}
+.card{background:var(--card);border-radius:16px;padding:18px;box-shadow:0 6px 24px #1b1f4b14;margin-bottom:18px}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:5px;font-weight:600}
+input,select{padding:10px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fafbff}
+button.go{background:linear-gradient(135deg,#5b6cff,#8a5bff);color:#fff;border:0;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;align-self:end;padding:11px}
+.sec{margin-top:22px}.sec h2{margin:0 0 4px;font-size:21px}.sec .sub{color:var(--mut);font-size:12px;margin-bottom:12px}
+.split{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;align-items:start}@media(max-width:850px){.split{grid-template-columns:1fr}}
+.list{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;max-height:520px;overflow:auto;padding:2px}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.item{background:#fff;border-radius:14px;padding:14px;border:1px solid var(--line)}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;color:#fff}
+.under{background:var(--ok)}.perfect{background:var(--warn)}.over{background:var(--bad)}
+.t-budget{background:#12b886}.t-medium{background:#4c6ef5}.t-luxury{background:#be4bdb}
+.big{font-size:22px;font-weight:700}.mut{color:var(--mut);font-size:12px}
+.tier{cursor:pointer;border:2px solid var(--line)}.tier.sel{border-color:var(--pri);box-shadow:0 4px 16px #5b6cff30}
+.bar{height:12px;border-radius:99px;background:#e9ebf7;overflow:hidden;margin:10px 0 4px}.bar i{display:block;height:100%;border-radius:99px}
+.route{display:flex;align-items:center;gap:10px;font-weight:600}.route .ln{flex:1;border-top:2px dashed #b9bff0}
+.row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.map{height:430px;border-radius:14px;z-index:0}
+.filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}.filters button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 14px;cursor:pointer;font-size:13px}
+.filters button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.day{border-left:3px solid var(--pri);padding:2px 0 2px 12px;margin-bottom:12px}.day b{color:var(--pri)}
+.num{display:inline-block;width:20px;height:20px;border-radius:50%;background:var(--pri);color:#fff;text-align:center;font-size:12px;line-height:20px;margin-right:6px}
+.ai{white-space:pre-wrap;line-height:1.55;font-size:14px}.pulse{animation:p 1.2s infinite}@keyframes p{50%{opacity:.4}}
+.pchips{display:flex;gap:8px;flex-wrap:wrap}.pchips span{border:1px solid var(--line);background:#fff;border-radius:99px;padding:6px 12px;cursor:pointer;font-size:13px;color:var(--ink)}.pchips span:hover{border-color:var(--pri);color:var(--pri)}
+a{color:var(--pri);text-decoration:none;font-size:12px}.err{color:var(--bad);font-weight:600}
+</style></head><body>
+<div class="hero"><h1>TripMind AI</h1><p>LLM-powered flights, hotels, places and budget planner</p>
+<div class="chips"><span>MCP tools</span><span>A2A agents</span><span id="llmstat">LLM: checking...</span><span>Under / Perfect / Over verdict</span></div></div>
+<div class="wrap">
+<div class="card"><form id="f">
+<label>From<select id="origin"></select></label><label>To<select id="destination"></select></label>
+<label>Start date<input type="date" id="start" required></label><label>End date<input type="date" id="end" required></label>
+<label>Travelers<input type="number" id="trav" min="1" max="20" value="2"></label>
+<label>Budget (INR)<input type="number" id="budget" value="60000"></label>
+<label>Hotel tier<select id="tier"><option>budget</option><option selected>medium</option><option>luxury</option></select></label>
+<label style="grid-column:1/-1">Your preferences - the AI will pick matching places (food, parks, beaches, ...)
+<input id="prefs" placeholder="e.g. best food places, parks, beaches, shopping"></label>
+<div class="pchips" style="grid-column:1/-1">
+<span data-w="best food places">🍽 Best food places</span><span data-w="parks">🌳 Parks &amp; nature</span><span data-w="beaches">🏖 Beaches</span>
+<span data-w="shopping">🛍 Shopping</span><span data-w="culture">🏛 Culture &amp; heritage</span><span data-w="adventure">⛰ Adventure</span><span data-w="nightlife">🌙 Nightlife</span></div>
+<button class="go">Plan my trip</button></form></div>
+<div id="out"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const $=id=>document.getElementById(id),inr=n=>"Rs "+Number(n).toLocaleString("en-IN");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TC={budget:"#12b886",medium:"#4c6ef5",luxury:"#be4bdb"};let D=null,maps={};
+$("start").value=new Date(Date.now()+7*864e5).toISOString().slice(0,10);$("end").value=new Date(Date.now()+11*864e5).toISOString().slice(0,10);
+fetch("/api/meta").then(r=>r.json()).then(m=>{m.cities.forEach(c=>$("origin").add(new Option(c)));m.destinations.forEach(c=>$("destination").add(new Option(c)));});
+fetch("/api/health").then(r=>r.json()).then(h=>{$("llmstat").textContent=h.configured?"LLM: "+h.llm:"LLM: add API key in .env";}).catch(()=>{});
+const gmap=(n,c)=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(n+" "+c);
+const pin=(t,c,sz=26)=>L.divIcon({className:"",html:`<div class="num" style="background:${c};width:${sz}px;height:${sz}px;line-height:${sz}px;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px #0005">${t}</div>`});
+function mapOf(id,markers,lines){
+ if(maps[id])maps[id].remove();const m=L.map(id);maps[id]=m;
+ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(m);
+ (lines||[]).forEach(l=>L.polyline(l.pts,{color:l.color,weight:4,dashArray:"8 6"}).addTo(m));
+ markers.forEach(k=>L.marker([k.lat,k.lng],{icon:pin(k.label,k.color)}).addTo(m).bindPopup(k.html));
+ m.fitBounds(markers.map(k=>[k.lat,k.lng]),{padding:[30,30],maxZoom:14});}
+
+function llmCard(){const l=D.llm;let b;
+ if(!l||l.pending)b='<div class="pulse">LLM planner is choosing the flight, hotels and route...</div>';
+ else if(!l.ok)b=`<div class="err">LLM planner unavailable (${esc(l.error||"")}). Showing the rule-based plan. Check the API key, model and URL in the .env file.</div>`;
+ else b=`<div class="mut">Model: ${esc(l.source)}</div>
+  <div class="row"><span>✈ Flight</span><b>${esc(D.flight_used)}</b></div><div class="mut">${esc(l.reasons.flight||"")}</div>
+  <div class="row"><span>🏨 Hotels</span><b>${["budget","medium","luxury"].map(k=>esc(D.tiers[k].hotel)).join(" · ")}</b></div><div class="mut">${esc(l.reasons.hotels||"")}</div>
+  <div class="row"><span>❤ Preferences</span><b>${esc(D.preferences||"none given")}</b></div><div class="mut">${esc(l.reasons.preferences||"")}</div>
+  <div class="row"><span>🗺 Route</span><b>${D.route.length} day(s)</b></div><div class="mut">${esc(l.reasons.route||"")}</div>
+  ${l.notes.length?`<div class="mut" style="margin-top:6px">Code checks: ${l.notes.map(esc).join("; ")}</div>`:""}`;
+ return `<div class="sec card"><h2>🧠 LLM planner decisions</h2><div class="sub">The LLM picks options and builds the route; code validates the names and recalculates the budget</div>${b}</div>`;}
+function summary(tier){
+ const t=D.tiers[tier],pct=Math.min(100,Math.round(t.total/D.budget*100)),col={under:"#2f9e44",perfect:"#f08c00",over:"#e03131"}[t.verdict];
+ $("sum").innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+  <div><span class="mut">Your budget</span><div class="big">${inr(D.budget)}</div></div>
+  <div><span class="mut">${tier.toUpperCase()} plan total</span><div class="big">${inr(t.total)}</div></div>
+  <div><span class="mut">Verdict</span><div><span class="tag ${t.verdict}" style="font-size:15px;padding:6px 16px">${t.verdict.toUpperCase()} BUDGET</span></div></div>
+  <div><span class="mut">${t.difference>=0?"You save":"Over by"}</span><div class="big" style="color:${col}">${inr(Math.abs(t.difference))}</div></div></div>
+  <div class="bar"><i style="width:${pct}%;background:${col}"></i></div><div class="mut">${Math.round(t.total/D.budget*100)}% of budget used</div>`;
+ document.querySelectorAll(".tier").forEach(e=>e.classList.toggle("sel",e.dataset.t==tier));}
+
+const CE={sightseeing:"📍",culture:"🏛",beach:"🏖",park:"🌳",food:"🍽",shopping:"🛍",adventure:"⛰",nightlife:"🌙"};
+const CC={sightseeing:"#4c6ef5",culture:"#7048e8",beach:"#15aabf",park:"#2f9e44",food:"#f08c00",shopping:"#e64980",adventure:"#e03131",nightlife:"#343a40"};
+function placesView(f){
+ const inRoute=new Set(D.route.flatMap(d=>d.stops.map(s=>s.name)));
+ document.querySelectorAll(".pf button").forEach(b=>b.classList.toggle("on",b.dataset.f==f));
+ const items=D.places.filter(p=>f=="all"||p.cat==f);
+ $("plist").innerHTML=items.map(p=>`<div class="item"><span class="tag" style="background:${CC[p.cat]}">${CE[p.cat]} ${p.cat.toUpperCase()}</span>${inRoute.has(p.name)?' <span class="tag under">IN YOUR ROUTE</span>':''}
+  <div style="font-weight:700;margin:8px 0 2px">${esc(p.name)}</div><div class="mut">${esc(p.note)}</div>
+  <div class="big" style="font-size:18px;margin-top:4px">${p.cost_pp?inr(p.cost_pp)+" /person":(p.cat=="food"?"Meal (in food budget)":"Free")}</div>
+  <a href="${gmap(p.name,D.destination)}" target="_blank">Open in Google Maps ↗</a></div>`).join("");
+ mapOf("pmap",items.map(p=>({lat:p.lat,lng:p.lng,label:CE[p.cat],color:CC[p.cat],html:`<b>${esc(p.name)}</b><br>${esc(p.cat)}`})));}
+function hotels(f){
+ document.querySelectorAll(".filters button").forEach(b=>b.classList.toggle("on",b.dataset.f==f));
+ const tiers=f=="all"?["budget","medium","luxury"]:[f],items=[];
+ tiers.forEach(k=>D.hotels[k].forEach(x=>items.push({...x,k})));
+ $("hlist").innerHTML=items.map(x=>`<div class="item"><span class="tag t-${x.k}">${x.k.toUpperCase()}</span>${D.tiers[x.k].hotel==x.name?(D.llm&&D.llm.ok?' <span class="tag t-luxury">LLM PICK</span>':' <span class="tag under">IN ESTIMATE</span>'):''}
+  <div style="font-weight:700;margin:8px 0 2px">${esc(x.name)}</div><div class="big">${inr(x.per_night)}</div><div class="mut">per night / room</div>
+  <div class="mut" style="margin-top:4px">${inr(x.per_night*D.tiers[x.k].rooms*D.nights)} for ${D.nights} nights, ${D.tiers[x.k].rooms} room(s)</div>
+  <a href="${gmap(x.name,D.destination)}" target="_blank">Open in Google Maps ↗</a></div>`).join("");
+ mapOf("hmap",items.map((x,i)=>({lat:x.lat,lng:x.lng,label:"H",color:TC[x.k],html:`<b>${esc(x.name)}</b><br>${x.k} · ${inr(x.per_night)}/night`})));}
+
+function render(){
+ let h=`<div class="card"><div class="route"><span>${esc(D.origin)}</span><span class="ln"></span><span>✈</span><span class="ln"></span><span>${esc(D.destination)}</span>
+ <span class="mut">${D.travelers} travelers · ${D.nights} nights</span></div><div id="sum" style="margin-top:14px"></div></div>`;
+ h+=llmCard();h+=`<div class="sec"><h2>💰 Budget comparison</h2><div class="sub">Click a plan to see its verdict</div><div class="fl">`;
+ for(const [k,t] of Object.entries(D.tiers)){const b=t.breakdown;
+  h+=`<div class="item tier" data-t="${k}" onclick="summary('${k}')"><span class="tag t-${k}">${k.toUpperCase()}</span> <span class="tag ${t.verdict}">${t.verdict.toUpperCase()}</span>
+  <div class="big" style="margin:8px 0">${inr(t.total)}</div>
+  <div class="row"><span>Flights</span><b>${inr(b.flights)}</b></div><div class="row"><span>Hotel (${t.rooms} room)</span><b>${inr(b.hotel)}</b></div>
+  <div class="row"><span>Food + local travel</span><b>${inr(b.food_local_transport)}</b></div><div class="row"><span>Attractions</span><b>${inr(b.attractions)}</b></div>
+  <div class="row"><span>Misc (5%)</span><b>${inr(b.misc_5pct)}</b></div></div>`;}
+ h+=`</div></div><div class="sec card"><h2>✈ Flight suggestions</h2><div class="sub">${esc(D.flights.airport)} · round trip, economy · sorted cheapest first</div><div class="fl">`;
+ D.flights.options.forEach((o,i)=>{h+=`<div class="item"><div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:16px">${esc(o.airline)}</b>${i==0?'<span class="tag under">CHEAPEST</span>':''}${o.airline==D.flight_used&&D.llm&&D.llm.ok?'<span class="tag t-luxury">LLM PICK</span>':''}</div>
+  <div class="mut" style="margin:4px 0 10px">${esc(D.origin)} ⇄ ${esc(D.destination)}</div><div class="big">${inr(o.per_person)}</div><div class="mut">per person</div>
+  <div class="row" style="margin-top:8px"><span>Total for ${D.travelers}</span><b>${inr(o.total)}</b></div></div>`;});
+ h+=`</div></div><div class="sec card"><h2>🏨 Hotel suggestions</h2><div class="sub">Real hotels · indicative nightly price per room · pins are approximate</div>
+ <div class="filters">${["all","budget","medium","luxury"].map(f=>`<button data-f="${f}" onclick="hotels('${f}')">${f.toUpperCase()}</button>`).join("")}</div>
+ <div class="split"><div class="list" id="hlist"></div><div id="hmap" class="map"></div></div></div>
+ <div class="sec card"><h2>📍 Places to visit, eat and relax</h2><div class="sub">Food, parks, beaches, culture and more. Places in your route are tagged. Food places: meals are covered by the daily food budget (prices shown in the notes are indicative)</div>
+ <div class="filters pf">${["all",...new Set(D.places.map(p=>p.cat))].map(f=>`<button data-f="${f}" onclick="placesView('${f}')">${f=="all"?"ALL ("+D.places.length+")":(CE[f]+" "+f.toUpperCase()+" ("+D.places.filter(p=>p.cat==f).length+")")}</button>`).join("")}</div>
+ <div class="split"><div class="list" id="plist"></div><div id="pmap" class="map"></div></div></div>
+ <div class="sec card"><h2>🗺 AI route plan</h2><div class="sub">Stops ordered by proximity and split across your days</div>
+ <div class="split"><div id="rmap" class="map"></div><div id="days"></div></div>
+ <h3 style="margin:18px 0 6px">🤖 AI travel plan <span class="mut" id="src"></span></h3><div class="ai pulse" id="ai">AI is writing your plan...</div></div>
+ <p class="mut">${esc(D.price_note)} Verify live prices and exact hotel locations before booking.</p>`;
+ $("out").innerHTML=h;summary(D.chosen_tier);hotels("all");
+ placesView("all");
+ const stops=D.route.flatMap(d=>d.stops),cols=["#5b6cff","#12b886","#f08c00","#be4bdb","#e03131"];
+ mapOf("rmap",stops.map((s,i)=>({lat:s.lat,lng:s.lng,label:i+1,color:cols[D.route.findIndex(d=>d.stops.includes(s))%5],html:`<b>${esc(s.name)}</b>`})),
+  D.route.map((d,i)=>({pts:d.stops.map(s=>[s.lat,s.lng]),color:cols[i%5]})));
+ $("days").innerHTML="<b>Day-wise route</b><br><br>"+D.route.map((d,i)=>`<div class="day" style="border-color:${cols[i%5]}"><b style="color:${cols[i%5]}">Day ${d.day}</b>`+
+  d.stops.map(s=>`<div style="margin-top:6px"><span class="num" style="background:${cols[i%5]}">${stops.indexOf(s)+1}</span>${CE[s.cat]} ${esc(s.name)}<div class="mut" style="margin-left:26px">${esc(s.note)}</div></div>`).join("")+`</div>`).join("");}
+
+async function post(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});
+ const t=await r.text();let j;try{j=JSON.parse(t);}catch(e){throw new Error("Server error: "+t.slice(0,80)+" - check the PowerShell window for the error.");}
+ if(!r.ok)throw new Error(typeof j.detail=="string"?j.detail:"Please check your inputs.");return j;}
+async function runPlan(){
+ $("out").innerHTML='<div class="card pulse">Agents are collecting flights, hotels and places...</div>';
+ try{D=await post("/api/plan",{origin:$("origin").value,destination:$("destination").value,start_date:$("start").value,end_date:$("end").value,
+  travelers:+$("trav").value,budget:+$("budget").value,hotel_tier:$("tier").value,preferences:$("prefs").value});}
+ catch(e){$("out").innerHTML='<div class="card err" id="e"></div>';$("e").textContent=e.message;return;}
+ D.llm={pending:true};render();
+ try{const l=await post("/api/llm-plan",D);Object.assign(D,{tiers:l.tiers,flight_used:l.flight_used,route:l.route,llm:l.llm});}
+ catch(e){D.llm={ok:false,error:e.message};}
+ render();
+ if(!D.llm.ok){$("ai").classList.remove("pulse");$("ai").textContent="AI plan skipped because the LLM is not available (see the red message above).";return;}
+ try{const a=await post("/api/narrate",D);$("ai").classList.remove("pulse");$("src").textContent="("+a.source+")";$("ai").innerHTML=esc(a.text).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");}
+ catch(x){$("ai").classList.remove("pulse");$("ai").textContent="AI plan unavailable.";}}
+$("f").onsubmit=e=>{e.preventDefault();runPlan();};
+document.querySelectorAll(".pchips span").forEach(b=>b.onclick=()=>{const v=$("prefs").value.trim(),w=b.dataset.w;
+ if(!v.toLowerCase().includes(w))$("prefs").value=v?v+", "+w:w;});
+</script></body></html>
